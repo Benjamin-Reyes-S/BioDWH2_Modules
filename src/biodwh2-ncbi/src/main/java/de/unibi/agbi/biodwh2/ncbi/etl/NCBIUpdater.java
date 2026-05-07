@@ -23,10 +23,10 @@ public class NCBIUpdater extends MultiFileFTPWebUpdater<NCBIDataSource> {
     protected String[] getFilePaths(final Workspace workspace) {
         final String genePrefix = "gene/DATA/";
         List<String> files = new ArrayList<>();
-        Collections.addAll(files, genePrefix + "gene_group.gz", genePrefix + "gene_history.gz",
+        Collections.addAll(files, genePrefix + "gene_group.gz", genePrefix + "gene_history.gz", 
+                           genePrefix + "gene2accession.gz",
                            genePrefix + "gene_info.gz", genePrefix + "gene_neighbors.gz",
-                           genePrefix + "gene_orthologs.gz", genePrefix + "gene_refseq_uniprotkb_collab.gz",
-                           genePrefix + "gene2accession.gz", genePrefix + "gene2ensembl.gz", genePrefix + "gene2go.gz",
+                           genePrefix + "gene_orthologs.gz", genePrefix + "gene_refseq_uniprotkb_collab.gz", genePrefix + "gene2ensembl.gz", genePrefix + "gene2go.gz",
                            genePrefix + "gene2pubmed.gz", genePrefix + "go_process.dtd", genePrefix + "go_process.xml",
                            genePrefix + "mim2gene_medgen", genePrefix + "stopwords_gene", genePrefix + "README",
                            genePrefix + "README_ensembl");

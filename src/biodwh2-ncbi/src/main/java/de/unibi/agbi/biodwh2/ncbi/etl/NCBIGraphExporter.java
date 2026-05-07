@@ -2,9 +2,7 @@ package de.unibi.agbi.biodwh2.ncbi.etl;
 
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
@@ -28,6 +26,7 @@ import de.unibi.agbi.biodwh2.ncbi.model.GeneGo;
 import de.unibi.agbi.biodwh2.ncbi.model.GeneInfo;
 import de.unibi.agbi.biodwh2.ncbi.model.GeneRelationship;
 
+// FOR COMPOUNDS 
 //import de.unibi.agbi.biodwh2.core.io.sdf.SdfEntry;
 //import de.unibi.agbi.biodwh2.core.io.sdf.SdfReader;
 //import java.nio.charset.StandardCharsets;
@@ -56,6 +55,7 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
         } catch (IOException e) {
             throw new ExporterException("Failed to export NCBI Gene database", e);
         }
+        //EXPORT FOR COMPOUNDS
         //try {
         //    exportPubChemDatabase(workspace, dataSource, graph);
         //} catch (IOException e) {
@@ -75,10 +75,9 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
             GeneInfo geneInfo = geneInfos.next();
             if (!geneInfo.taxonomyId.equals("9606"))
                 continue;
-            long geneId = Long.parseLong(geneInfo.geneId);
-            Node geneNode = graph.addNode("Gene");
+            long geneId = Long.parseLong(geneInfo.geneId); //NCBI gene identifier
+            Node geneNode = graph.addNode("Gene"); // Node internal identifier
             geneNode.setProperty("id", geneId);
-            
             setPropertyIfNotDash(geneNode, "symbol", geneInfo.symbol); 
             setPropertyIfNotDash(geneNode, "chromosome", geneInfo.chromosome);
             setPropertyIfNotDash(geneNode, "locus_tag", geneInfo.locusTag);
@@ -87,6 +86,7 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
             setArrayPropertyIfNotDash(geneNode, "synonyms", geneInfo.synonyms);
             setArrayPropertyIfNotDash(geneNode, "xrefs", geneInfo.dbXrefs);
             setArrayPropertyIfNotDash(geneNode, "feature_types", geneInfo.featureType);
+            //FOR COMPOUNDS
             // TODO: mapLocation, symbolFromNomenclatureAuthority, fullNameFromNomenclatureAuthority,
             // TODO: nomenclatureStatus, otherDesignations
             geneIdNodeIdMap.put(geneId, geneNode.getId());
@@ -103,7 +103,8 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
             Node accessionNode = createAccessionNode(graph, accession);
             graph.addEdge(geneIdNodeIdMap.get(geneId), accessionNode, "HAS_ACCESSION");
         }
-        // takes long here!! why?
+
+        // remote to test withouth 
         LOGGER.info("Exporting gene2go.gz..."); 
         MappingIterator<GeneGo> goAnnotations = FileUtils.openGzipTsv(workspace, dataSource, "gene2go.gz",
                                                                       GeneGo.class);
@@ -125,7 +126,7 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
             setPropertyIfNotDash(edge, "qualifier", go.qualifier);
             setArrayPropertyIfNotDash(edge, "pubmed_ids", go.pubMedIds);
             graph.update(edge);
-        }
+        }  
         LOGGER.info("Exporting gene_group.gz...");
         MappingIterator<GeneRelationship> groups = FileUtils.openGzipTsv(workspace, dataSource, "gene_group.gz",
                                                                          GeneRelationship.class);
@@ -133,9 +134,20 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
             GeneRelationship group = groups.next();
             if (!group.taxonomyId.equals("9606") || !group.otherTaxonomyId.equals("9606"))
                 continue;
+            // reference the NCBI ids
             long geneId = Long.parseLong(group.geneId);
             long otherGeneId = Long.parseLong(group.otherGeneId);
-            Edge edge = graph.addEdge(geneId, otherGeneId, "RELATED_TO");
+
+         
+            // reference the internal node ids 
+            Long geneNodeId = geneIdNodeIdMap.get(geneId);
+            Long otherGeneNodeId = geneIdNodeIdMap.get(otherGeneId);
+
+            if (geneNodeId == null || otherGeneNodeId == null)
+                continue;
+
+            // check empty relationship type
+            Edge edge = graph.addEdge(geneNodeId, otherGeneNodeId, "RELATED_TO");
             edge.setProperty("type", group.relationship);
             graph.update(edge);
         }    
@@ -146,39 +158,22 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
             GeneRelationship ortholog = orthologs.next();
             if (!ortholog.taxonomyId.equals("9606") || !ortholog.otherTaxonomyId.equals("9606"))
                 continue;
+            // reference the NCBI ids
             long geneId = Long.parseLong(ortholog.geneId);
             long otherGeneId = Long.parseLong(ortholog.otherGeneId);
-            Edge edge = graph.addEdge(geneId, otherGeneId, "RELATED_TO");
+            // reference the internal node ids
+            Long geneNodeId = geneIdNodeIdMap.get(geneId);
+            Long otherGeneNodeId = geneIdNodeIdMap.get(otherGeneId);
+
+            // check that reference NCBI ids from gene_orthologs.gz are alsp added nodes in the graph from gene_info.gz
+            if (geneNodeId == null || otherGeneNodeId == null)
+                continue;
+            Edge edge = graph.addEdge(geneNodeId, otherGeneNodeId, "RELATED_TO");
             edge.setProperty("type", ortholog.relationship);
             graph.update(edge);
         }
-        LOGGER.info("Exporting gene2pubmed.gz...");
-        MappingIterator<String[]> genePubMed = FileUtils.openGzipTsv(workspace, dataSource, "gene2pubmed.gz",
-                                                                     String[].class);
-        long lastGeneId = -1;
-        Set<Long> currentPubMedIds = new HashSet<>();
-        while (genePubMed.hasNext()) {
-            String[] pubMedAnnotation = genePubMed.next();
-            if (!pubMedAnnotation[0].equals("9606"))
-                continue;
-            long geneId = Long.parseLong(pubMedAnnotation[1]);
-            if (geneId != lastGeneId) {
-                if (lastGeneId != -1) {
-                    Node geneNode = graph.getNode(geneIdNodeIdMap.get(lastGeneId));
-                    geneNode.setProperty("pubmed_ids", currentPubMedIds.toArray(new Long[0]));
-                    graph.update(geneNode);
-                    currentPubMedIds.clear();
-                }
-                lastGeneId = geneId;
-            }
-            currentPubMedIds.add(Long.parseLong(pubMedAnnotation[2]));
+
         }
-        if (currentPubMedIds.size() > 0) {
-            Node geneNode = graph.getNode(geneIdNodeIdMap.get(lastGeneId));
-            geneNode.setProperty("pubmed_ids", currentPubMedIds.toArray(new Long[0]));
-            graph.update(geneNode);
-        }
-    }
 
     private Node createAccessionNode(final Graph graph, final GeneAccession accession) {
         Node accessionNode = graph.addNode("Accession");
@@ -218,5 +213,36 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
         if (value != null && !"-".equals(value) && value.trim().length() > 0)
             container.setProperty(propertyKey, StringUtils.split(value, "|"));
     }
+    
 
+    //PARSER FOR COMPOUNDS
+    //private void exportPubChemDatabase(final Workspace workspace, final DataSource dataSource,
+      //                                 final Graph graph) throws IOException {
+       // final String[] fileNames = dataSource.listSourceFiles(workspace);
+        //for (final String fileName : fileNames)
+            //if (fileName.startsWith("Compound_") && fileName.endsWith(".sdf.gz")) {
+                //final SdfReader reader = new SdfReader(FileUtils.openGzip(workspace, dataSource, fileName),
+                 //                                      StandardCharsets.UTF_8);
+                //for (final SdfEntry entry : reader)
+                //    createPubChemCompoundNode(graph, entry);
+            //}
+    //}
+
+    //private void createPubChemCompoundNode(final Graph graph, final SdfEntry entry) {
+        //Node node = graph.addNode("Compound");
+        //node.setProperty("id", Long.parseLong(entry.properties.get("PUBCHEM_COMPOUND_CID")));
+        //node.setProperty("IUPAC_openeye_name", entry.properties.get("PUBCHEM_IUPAC_OPENEYE_NAME"));
+        //node.setProperty("IUPAC_cas_name", entry.properties.get("PUBCHEM_IUPAC_CAS_NAME"));
+        //node.setProperty("IUPAC_name_markup", entry.properties.get("PUBCHEM_IUPAC_NAME_MARKUP"));
+        //node.setProperty("IUPAC_name", entry.properties.get("PUBCHEM_IUPAC_NAME"));
+        //node.setProperty("IUPAC_systematic_name", entry.properties.get("PUBCHEM_IUPAC_SYSTEMATIC_NAME"));
+        //node.setProperty("IUPAC_traditional_name", entry.properties.get("PUBCHEM_IUPAC_TRADITIONAL_NAME"));
+        //node.setProperty("IUPAC_inchi", entry.properties.get("PUBCHEM_IUPAC_INCHI"));
+        //node.setProperty("IUPAC_inchi_key", entry.properties.get("PUBCHEM_IUPAC_INCHIKEY"));
+        //node.setProperty("IUPAC_openeye_canonical_smiles", entry.properties.get("PUBCHEM_OPENEYE_CAN_SMILES"));
+        //node.setProperty("IUPAC_openeye_iso_smiles", entry.properties.get("PUBCHEM_OPENEYE_ISO_SMILES"));
+        //graph.update(node);
+    //}
+
+    //PROTEINS PARSER
 }
