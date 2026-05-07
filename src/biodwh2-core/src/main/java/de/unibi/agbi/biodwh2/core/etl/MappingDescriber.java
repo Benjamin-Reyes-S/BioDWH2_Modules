@@ -1,7 +1,12 @@
 package de.unibi.agbi.biodwh2.core.etl;
 
 import de.unibi.agbi.biodwh2.core.DataSource;
-import de.unibi.agbi.biodwh2.core.model.graph.*;
+import de.unibi.agbi.biodwh2.core.model.graph.Edge;
+import de.unibi.agbi.biodwh2.core.model.graph.Graph;
+import de.unibi.agbi.biodwh2.core.model.graph.Node;
+import de.unibi.agbi.biodwh2.core.model.graph.NodeMappingDescription;
+import de.unibi.agbi.biodwh2.core.model.graph.PathMapping;
+import de.unibi.agbi.biodwh2.core.model.graph.PathMappingDescription;
 
 public abstract class MappingDescriber {
     private final DataSource dataSource;

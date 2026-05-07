@@ -1,0 +1,11 @@
+{
+  "version" : 1,
+  "creationDateTime" : "2026-05-06T12:49:05.12704986",
+  "dataSourceIds" : [ ],
+  "outputFormatIds" : [ "GRAPHML" ],
+  "globalProperties" : {
+    "speciesFilter" : [ ]
+  },
+  "dataSourceProperties" : { },
+  "skipMetaGraphGeneration" : false
+}

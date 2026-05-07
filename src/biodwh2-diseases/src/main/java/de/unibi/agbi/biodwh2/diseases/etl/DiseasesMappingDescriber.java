@@ -21,31 +21,34 @@ public class DiseasesMappingDescriber extends MappingDescriber {
 
     @Override
    public NodeMappingDescription[] describe(final Graph graph, final Node node, final String localMappingLabel) {
-        if (DiseasesGraphExporter.GENE_LABEL.equals(localMappingLabel))
+        if (DiseasesGraphExporter.GENE_LABEL.equals(localMappingLabel)) 
             return describeGene(node);
         if (DiseasesGraphExporter.DISEASE_LABEL.equals(localMappingLabel))
             return describeDisease(node);
         return null;
     }
 
+// Introduce 2 new nodes with label PROTEIN and MI_RNA
     private NodeMappingDescription[] describeGene(final Node node) {
+        // checks if node has id 
         final String id = node.getProperty(GraphExporter.ID_KEY);
         if (id == null)
             return null;
+        // if node has "name" checks if starts with ENSP --> Protein 
         final String name = node.getProperty("name");
         if (id.startsWith("ENSP")) {
-            final var description = new NodeMappingDescription(NodeMappingDescription.NodeType.PROTEIN);
+            final var description = new NodeMappingDescription(NodeMappingDescription.NodeType.PROTEIN); //var  let Java figure out the type automatically (Class type)
             description.addName(name);
             description.addIdentifier(IdentifierType.ENSEMBL, id);
             return new NodeMappingDescription[]{description};
         }
+        // check for RNAs 
         if (id.startsWith("hsa-miR") || id.startsWith("hsa-let")) {
             final var description = new RNANodeMappingDescription(RNANodeMappingDescription.RNAType.MI_RNA);
             description.addName(name);
             description.addIdentifier(IdentifierType.MIRNA, id);
             return new NodeMappingDescription[]{description};
         }
-        // hsa_circ_000939, LINC00550
         return null;
     }
 
@@ -60,12 +63,11 @@ public class DiseasesMappingDescriber extends MappingDescriber {
             description.addIdentifier(IdentifierType.DOID, Integer.parseInt(parts[1]));
             return new NodeMappingDescription[]{description};
         }
-        if ("ICD10".equals(parts[0])) {
+        //if ("ICD10".equals(parts[0])) {
             // TODO: quality check
             // description.addIdentifier(IdentifierType.ICD10, parts[1]);
             // return new NodeMappingDescription[]{description};
-        }
-        // AmyCo
+        //}
         return null;
     }
 

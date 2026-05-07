@@ -1,5 +1,10 @@
 package de.unibi.agbi.biodwh2.core.etl;
 
+import java.nio.file.Path;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import de.unibi.agbi.biodwh2.core.DataSource;
 import de.unibi.agbi.biodwh2.core.Workspace;
 import de.unibi.agbi.biodwh2.core.exceptions.ExporterException;
@@ -14,10 +19,6 @@ import de.unibi.agbi.biodwh2.core.model.graph.meta.MetaGraph;
 import de.unibi.agbi.biodwh2.core.text.MetaGraphDynamicVisWriter;
 import de.unibi.agbi.biodwh2.core.text.MetaGraphExtendedStatisticsWriter;
 import de.unibi.agbi.biodwh2.core.text.MetaGraphStatisticsWriter;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
-import java.nio.file.Path;
 
 public abstract class GraphExporter<D extends DataSource> {
     private static final Logger LOGGER = LogManager.getLogger(GraphExporter.class);

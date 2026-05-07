@@ -1,5 +1,12 @@
 package de.unibi.agbi.biodwh2.diseases.etl;
 
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import de.unibi.agbi.biodwh2.core.Workspace;
 import de.unibi.agbi.biodwh2.core.etl.GraphExporter;
 import de.unibi.agbi.biodwh2.core.exceptions.ExporterException;
@@ -11,12 +18,6 @@ import de.unibi.agbi.biodwh2.diseases.DiseasesDataSource;
 import de.unibi.agbi.biodwh2.diseases.model.ExperimentEntry;
 import de.unibi.agbi.biodwh2.diseases.model.KnowledgeEntry;
 import de.unibi.agbi.biodwh2.diseases.model.TextMiningEntry;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 
 public class DiseasesGraphExporter extends GraphExporter<DiseasesDataSource> {
     private static final Logger LOGGER = LogManager.getLogger(DiseasesGraphExporter.class);

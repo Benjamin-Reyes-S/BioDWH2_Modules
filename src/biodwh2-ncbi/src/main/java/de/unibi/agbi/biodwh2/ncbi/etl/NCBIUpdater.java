@@ -1,14 +1,13 @@
 package de.unibi.agbi.biodwh2.ncbi.etl;
 
-import de.unibi.agbi.biodwh2.core.Workspace;
-import de.unibi.agbi.biodwh2.core.etl.MultiFileFTPWebUpdater;
-import de.unibi.agbi.biodwh2.core.net.HTTPFTPClient;
-import de.unibi.agbi.biodwh2.ncbi.NCBIDataSource;
-
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+
+import de.unibi.agbi.biodwh2.core.Workspace;
+import de.unibi.agbi.biodwh2.core.etl.MultiFileFTPWebUpdater;
+import de.unibi.agbi.biodwh2.ncbi.NCBIDataSource;
+//import java.io.IOException;
 
 public class NCBIUpdater extends MultiFileFTPWebUpdater<NCBIDataSource> {
     public NCBIUpdater(NCBIDataSource dataSource) {
@@ -31,15 +30,18 @@ public class NCBIUpdater extends MultiFileFTPWebUpdater<NCBIDataSource> {
                            genePrefix + "gene2pubmed.gz", genePrefix + "go_process.dtd", genePrefix + "go_process.xml",
                            genePrefix + "mim2gene_medgen", genePrefix + "stopwords_gene", genePrefix + "README",
                            genePrefix + "README_ensembl");
-        try {
-            String pubchemPrefix = "pubchem/Compound/CURRENT-Full/SDF/";
-            HTTPFTPClient.Entry[] pubchemEntries = client.listDirectory(pubchemPrefix);
-            for (HTTPFTPClient.Entry entry : pubchemEntries)
-                if (entry.name.endsWith(".gz"))
-                    files.add(pubchemPrefix + entry.name);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+
+        //    private void exportPubChemDatabase(final Workspace workspace, final DataSource dataSource,
+                                       //final Graph graph) throws IOException {
+        //final String[] fileNames = dataSource.listSourceFiles(workspace);
+        //for (final String fileName : fileNames)
+            //if (fileName.startsWith("Compound_") && fileName.endsWith(".sdf.gz")) {
+                //final SdfReader reader = new SdfReader(FileUtils.openGzip(workspace, dataSource, fileName),
+                                                       //StandardCharsets.UTF_8);
+                //for (final SdfEntry entry : reader)
+                    //createPubChemCompoundNode(graph, entry);
+            //}
+
         return files.toArray(new String[0]);
     }
 }
