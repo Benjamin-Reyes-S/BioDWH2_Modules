@@ -1,6 +1,8 @@
 package de.unibi.agbi.biodwh2.ncbi.etl;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -34,6 +36,7 @@ import de.unibi.agbi.biodwh2.ncbi.model.GeneRelationship;
 public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
     private static final Logger LOGGER = LogManager.getLogger(NCBIGraphExporter.class);
     private Map<Long, Long> geneIdNodeIdMap;
+    private Map<String, Long> proteinIdNodeIdMap;
 
     public NCBIGraphExporter(final NCBIDataSource dataSource) {
         super(dataSource);
@@ -48,10 +51,13 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
     protected boolean exportGraph(final Workspace workspace, final Graph graph) throws ExporterException {
         //defines schemaic constraints in the graph --> Node labels: Gene and compound
         graph.addIndex(IndexDescription.forNode("Gene", "id", IndexDescription.Type.UNIQUE));
+        graph.addIndex(IndexDescription.forNode("Protein", "id", IndexDescription.Type.UNIQUE));
         graph.addIndex(IndexDescription.forNode("Compound", "id", IndexDescription.Type.UNIQUE));
         geneIdNodeIdMap = new HashMap<>();
+        proteinIdNodeIdMap = new HashMap<>();
         try {
             exportGeneDatabase(workspace, dataSource, graph);
+            exportProteinDatabase(workspace, dataSource, graph);
         } catch (IOException e) {
             throw new ExporterException("Failed to export NCBI Gene database", e);
         }
@@ -64,7 +70,63 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
         return true;
     }
 
+    // Protein exporter
+    private void exportProteinDatabase(final Workspace workspace,
+                                    final DataSource dataSource,
+                                    final Graph graph) throws IOException {
+        LOGGER.info("Exporting protein.gpff...");
+        // first open and read the input from file
+        InputStream proteinStream = FileUtils.openInput( workspace, dataSource,
+                                                "vertebrate_mammalian.10.protein.gpff.gz");
+        //create a buffered reader to read the file line by line
+        try (final BufferedReader reader = FileUtils.createBufferedReaderFromStream(
+                proteinStream)) {
+            
+            final StringBuilder record = new StringBuilder();
+            String line;
+        // read line by line unless no more lines are available 
+            while ((line = reader.readLine()) != null) {
+                record.append(line).append("\n");
 
+                // "//" indicates the end of one protein record
+                if (line.equals("//")) {
+                    parseProteinRecord(graph, record.toString());
+                    record.setLength(0);
+                }
+            }
+        }
+    }
+    //Protein parser
+    private void parseProteinRecord(final Graph graph, final String record) {
+    // pass variables to store the relevant properties of the protein record
+    String proteinId = null;
+    String version = null;
+    String definition = null;
+    // parse the record 
+    for (String entry : record.split("\n")) {
+        if (entry.startsWith("ACCESSION")) {
+            proteinId = entry.substring(12).trim();
+        } else if (entry.startsWith("VERSION")) {
+            version = entry.substring(12).trim();
+        } else if (entry.startsWith("DEFINITION")) {
+            definition = entry.substring(12).trim();
+        }
+    }
+
+    if (proteinId == null)
+        return;
+    // create Protein node 
+    Node proteinNode = graph.addNode("Protein");
+    proteinNode.setProperty("id", proteinId);
+    if (version != null)
+        proteinNode.setProperty("version", version);
+    if (definition != null)
+        proteinNode.setProperty("definition", definition);
+    proteinIdNodeIdMap.put(proteinId, proteinNode.getId()); //implement proteinIdNodeIdMap as a class in the ncbi model package
+    graph.update(proteinNode);
+    }
+
+    // GENES EXPORTER
     private void exportGeneDatabase(final Workspace workspace, final DataSource dataSource,
                                     final Graph graph) throws IOException {
         LOGGER.info("Exporting gene_info.gz...");
@@ -86,9 +148,8 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
             setArrayPropertyIfNotDash(geneNode, "synonyms", geneInfo.synonyms);
             setArrayPropertyIfNotDash(geneNode, "xrefs", geneInfo.dbXrefs);
             setArrayPropertyIfNotDash(geneNode, "feature_types", geneInfo.featureType);
-            //FOR COMPOUNDS
-            // TODO: mapLocation, symbolFromNomenclatureAuthority, fullNameFromNomenclatureAuthority,
-            // TODO: nomenclatureStatus, otherDesignations
+            setPropertyIfNotDash(geneNode, "nomenclature_status", geneInfo.nomenclatureStatus);
+            setArrayPropertyIfNotDash(geneNode, "other_designations", geneInfo.otherDesignations);
             geneIdNodeIdMap.put(geneId, geneNode.getId());
             graph.update(geneNode);
         }
@@ -244,5 +305,6 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
         //graph.update(node);
     //}
 
-    //PROTEINS PARSER
 }
+
+
