@@ -1,8 +1,7 @@
 package de.unibi.agbi.biodwh2.ncbi.etl;
-
+//import java.io.InputStream;
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -44,7 +43,7 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
 
     @Override
     public long getExportVersion() {
-        return 1;
+        return 2;
     }
 
     @Override
@@ -53,6 +52,7 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
         graph.addIndex(IndexDescription.forNode("Gene", "id", IndexDescription.Type.UNIQUE));
         graph.addIndex(IndexDescription.forNode("Protein", "id", IndexDescription.Type.UNIQUE));
         graph.addIndex(IndexDescription.forNode("Compound", "id", IndexDescription.Type.UNIQUE));
+        graph.addIndex(IndexDescription.forNode("Accession", "protein_accession.version", IndexDescription.Type.NON_UNIQUE));
         geneIdNodeIdMap = new HashMap<>();
         proteinIdNodeIdMap = new HashMap<>();
         try {
@@ -68,62 +68,6 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
         //    throw new ExporterException("Failed to export NCBI PubChem database", e);
         //}
         return true;
-    }
-
-    // Protein exporter
-    private void exportProteinDatabase(final Workspace workspace,
-                                    final DataSource dataSource,
-                                    final Graph graph) throws IOException {
-        LOGGER.info("Exporting protein.gpff...");
-        // first open and read the input from file
-        InputStream proteinStream = FileUtils.openInput( workspace, dataSource,
-                                                "vertebrate_mammalian.10.protein.gpff.gz");
-        //create a buffered reader to read the file line by line
-        try (final BufferedReader reader = FileUtils.createBufferedReaderFromStream(
-                proteinStream)) {
-            
-            final StringBuilder record = new StringBuilder();
-            String line;
-        // read line by line unless no more lines are available 
-            while ((line = reader.readLine()) != null) {
-                record.append(line).append("\n");
-
-                // "//" indicates the end of one protein record
-                if (line.equals("//")) {
-                    parseProteinRecord(graph, record.toString());
-                    record.setLength(0);
-                }
-            }
-        }
-    }
-    //Protein parser
-    private void parseProteinRecord(final Graph graph, final String record) {
-    // pass variables to store the relevant properties of the protein record
-    String proteinId = null;
-    String version = null;
-    String definition = null;
-    // parse the record 
-    for (String entry : record.split("\n")) {
-        if (entry.startsWith("ACCESSION")) {
-            proteinId = entry.substring(12).trim();
-        } else if (entry.startsWith("VERSION")) {
-            version = entry.substring(12).trim();
-        } else if (entry.startsWith("DEFINITION")) {
-            definition = entry.substring(12).trim();
-        }
-    }
-
-    if (proteinId == null)
-        return;
-    // create Protein node 
-    Node proteinNode = graph.addNode("Protein");
-    proteinNode.setProperty("id", proteinId);
-    if (version != null)
-        proteinNode.setProperty("version", version);
-    if (definition != null)
-        proteinNode.setProperty("definition", definition);
-    proteinIdNodeIdMap.put(proteinId, proteinNode.getId()); //implement proteinIdNodeIdMap as a class in the ncbi model package
-    graph.update(proteinNode);
     }
 
     // GENES EXPORTER
@@ -274,37 +218,108 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
         if (value != null && !"-".equals(value) && value.trim().length() > 0)
             container.setProperty(propertyKey, StringUtils.split(value, "|"));
     }
-    
 
-    //PARSER FOR COMPOUNDS
-    //private void exportPubChemDatabase(final Workspace workspace, final DataSource dataSource,
-      //                                 final Graph graph) throws IOException {
-       // final String[] fileNames = dataSource.listSourceFiles(workspace);
-        //for (final String fileName : fileNames)
-            //if (fileName.startsWith("Compound_") && fileName.endsWith(".sdf.gz")) {
-                //final SdfReader reader = new SdfReader(FileUtils.openGzip(workspace, dataSource, fileName),
-                 //                                      StandardCharsets.UTF_8);
-                //for (final SdfEntry entry : reader)
-                //    createPubChemCompoundNode(graph, entry);
-            //}
-    //}
 
-    //private void createPubChemCompoundNode(final Graph graph, final SdfEntry entry) {
-        //Node node = graph.addNode("Compound");
-        //node.setProperty("id", Long.parseLong(entry.properties.get("PUBCHEM_COMPOUND_CID")));
-        //node.setProperty("IUPAC_openeye_name", entry.properties.get("PUBCHEM_IUPAC_OPENEYE_NAME"));
-        //node.setProperty("IUPAC_cas_name", entry.properties.get("PUBCHEM_IUPAC_CAS_NAME"));
-        //node.setProperty("IUPAC_name_markup", entry.properties.get("PUBCHEM_IUPAC_NAME_MARKUP"));
-        //node.setProperty("IUPAC_name", entry.properties.get("PUBCHEM_IUPAC_NAME"));
-        //node.setProperty("IUPAC_systematic_name", entry.properties.get("PUBCHEM_IUPAC_SYSTEMATIC_NAME"));
-        //node.setProperty("IUPAC_traditional_name", entry.properties.get("PUBCHEM_IUPAC_TRADITIONAL_NAME"));
-        //node.setProperty("IUPAC_inchi", entry.properties.get("PUBCHEM_IUPAC_INCHI"));
-        //node.setProperty("IUPAC_inchi_key", entry.properties.get("PUBCHEM_IUPAC_INCHIKEY"));
-        //node.setProperty("IUPAC_openeye_canonical_smiles", entry.properties.get("PUBCHEM_OPENEYE_CAN_SMILES"));
-        //node.setProperty("IUPAC_openeye_iso_smiles", entry.properties.get("PUBCHEM_OPENEYE_ISO_SMILES"));
-        //graph.update(node);
-    //}
+    // Protein exporter
+    private void exportProteinDatabase(final Workspace workspace,
+                                    final DataSource dataSource,
+                                    final Graph graph) throws IOException {
+        LOGGER.info("Exporting protein.gpff...");
+        // first open and read the input from file, file is .gz so must use openGzip
+        try (final BufferedReader reader = FileUtils.createBufferedReaderFromStream(
+                FileUtils.openGzip(workspace, dataSource, "vertebrate_mammalian.10.protein.gpff.gz"))) {
+            final StringBuilder record = new StringBuilder();
+            String line;
+            // read line by line unless no more lines are available
+            while ((line = reader.readLine()) != null) {
+                record.append(line).append("\n");
+                // "//" indicates the end of one protein record
+                if (line.equals("//")) {
+                    parseProteinRecord(graph, record.toString());
+                    record.setLength(0);
+                }
+            }
+        }
+    }
 
+    private void parseProteinRecord(final Graph graph, final String record) {
+        // pass variables to store the relevant properties of the protein record
+        String proteinId = null;
+        String version = null;
+        String locus = null;
+        String db_link=null; 
+        String keyword = null;
+        String source= null;
+        // String organism = null; requires implementation still!!
+        // use StringBuilder for definition — it can span multiple continuation lines
+        StringBuilder definitionBuilder = new StringBuilder();
+        boolean inDefinition = false;
+
+        // parse the record
+        for (String entry : record.split("\n")) {
+            if (entry.startsWith("LOCUS")) {
+                locus = entry.substring(12).trim();
+                inDefinition = false;
+            } else if (entry.startsWith("DEFINITION")) {
+                definitionBuilder.append(entry.substring(12).trim());
+                inDefinition = true;
+            } else if (entry.startsWith("ACCESSION")) {
+                proteinId = entry.substring(12).trim();
+                inDefinition = false;
+            } else if (entry.startsWith("VERSION")) {
+                version = entry.substring(12).trim();
+                inDefinition = false;
+            } else if (inDefinition && entry.startsWith("  ")) {
+                // continuation line of DEFINITION (starts with whitespace, no keyword)
+                definitionBuilder.append(" ").append(entry.trim());
+
+            } else if (entry.startsWith("DBLINK")) {
+                db_link = entry.substring(12).trim();
+                inDefinition = false;
+            } else if (entry.startsWith("KEYWORDS")) {
+                keyword = entry.substring(12).trim();
+                inDefinition = false;
+            } else if (entry.startsWith("SOURCE")) {
+                source = entry.substring(12).trim();
+                inDefinition = false;   
+            } else {
+                inDefinition = false;
+            }
+        }
+
+        if (proteinId == null)
+            return;
+
+        String definition = definitionBuilder.length() > 0 ? definitionBuilder.toString() : null;
+
+        // create Protein node
+        Node proteinNode = graph.addNode("Protein");
+        proteinNode.setProperty("id", proteinId);
+        if (version != null)
+            proteinNode.setProperty("version", version);
+        if (definition != null)
+            proteinNode.setProperty("definition", definition);
+        if (locus != null)
+            proteinNode.setProperty("locus", locus);
+        if (db_link != null)
+            proteinNode.setProperty("db_link", db_link);
+        if (keyword != null)
+            proteinNode.setProperty("keyword", keyword);
+        if (source != null)
+            proteinNode.setProperty("source", source);
+        // update node before adding edges
+        graph.update(proteinNode);
+        proteinIdNodeIdMap.put(proteinId, proteinNode.getId()); //implement proteinIdNodeIdMap as a class in the ncbi model package
+
+        // find corresponding accession node for protein via "version" property
+        Node accessionNode = graph.findNode("Accession",
+                                            "protein_accession.version", version);
+        if (accessionNode == null)
+            return; // no gene2accession entry for this protein → skip
+
+        // Connect Protein → Accession
+        graph.addEdge(proteinNode, accessionNode, "HAS_ACCESSION");
+    }
 }
 
 

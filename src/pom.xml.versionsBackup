@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>de.unibi.agbi.biodwh2</groupId>
+    <artifactId>biodwh2</artifactId>
+    <version>0.6.8</version> <!-- BioDWH2 version -->
+
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/biodwh2/BioDWH2</url>
+        </repository>
+    </distributionManagement>
+
+    <modules>
+        <module>biodwh2-core</module>
+        <module>biodwh2-drugbank</module>
+        <module>biodwh2-hgnc</module>
+        <module>biodwh2-ndfrt</module>
+        <module>biodwh2-dgidb</module>
+        <module>biodwh2-medrt</module>
+        <module>biodwh2-main</module>
+        <module>biodwh2-drugcentral</module>
+        <module>biodwh2-kegg</module>
+        <module>biodwh2-pharmgkb</module>
+        <module>biodwh2-sider</module>
+        <module>biodwh2-geneontology</module>
+        <module>biodwh2-hpo</module>
+        <module>biodwh2-unii</module>
+        <module>biodwh2-ncbi</module>
+        <module>biodwh2-itis</module>
+        <module>biodwh2-usdaplants</module>
+        <module>biodwh2-cancerdrugsdb</module>
+        <module>biodwh2-gene2phenotype</module>
+        <module>biodwh2-canadiannutrientfile</module>
+        <module>biodwh2-uniprot</module>
+        <module>biodwh2-ema</module>
+        <module>biodwh2-pathwaycommons</module>
+        <module>biodwh2-redodb</module>
+        <module>biodwh2-redotrialsdb</module>
+        <module>biodwh2-gwascatalog</module>
+        <module>biodwh2-opentargets</module>
+        <module>biodwh2-omim</module>
+        <module>biodwh2-string</module>
+        <module>biodwh2-stitch</module>
+        <module>biodwh2-adrecs</module>
+        <module>biodwh2-intact</module>
+        <module>biodwh2-herb</module>
+        <module>biodwh2-cmaup</module>
+        <module>biodwh2-tissues</module>
+        <module>biodwh2-diseases</module>
+        <module>biodwh2-ttd</module>
+        <module>biodwh2-guidetopharmacology</module>
+        <module>biodwh2-negatome</module>
+        <module>biodwh2-interpro</module>
+        <module>biodwh2-gencc</module>
+        <module>biodwh2-t3db</module>
+        <module>biodwh2-mirbase</module>
+        <module>biodwh2-mirtarbase</module>
+        <module>biodwh2-tarbase</module>
+        <module>biodwh2-clinicaltrialsgov</module>
+        <module>biodwh2-rnainter</module>
+        <module>biodwh2-mirdb</module>
+        <module>biodwh2-trrust</module>
+        <module>biodwh2-refseq</module>
+        <module>biodwh2-rnalocate</module>
+        <module>biodwh2-h2-mvstore</module>
+        <module>biodwh2-rnadisease</module>
+        <module>biodwh2-brenda</module>
+        <module>biodwh2-expasy</module>
+        <module>biodwh2-hprd</module>
+        <module>biodwh2-hmdb</module>
+        <module>biodwh2-cpdb</module>
+        <module>biodwh2-nsides</module>
+        <module>biodwh2-mir2disease</module>
+        <module>biodwh2-biom2metdisease</module>
+        <module>biodwh2-ontologies</module>
+        <module>biodwh2-iid</module>
+        <module>biodwh2-npcdr</module>
+        <module>biodwh2-reactome</module>
+        <module>biodwh2-chebi</module>
+        <module>biodwh2-drugmap</module>
+        <module>biodwh2-iig</module>
+        <module>biodwh2-themarker</module>
+        <module>biodwh2-markerdb</module>
+        <module>biodwh2-bionda</module>
+        <module>biodwh2-ptmd</module>
+        <module>biodwh2-qptm</module>
+        <module>biodwh2-qptmplants</module>
+        <module>biodwh2-iptmnet</module>
+        <module>biodwh2-edk</module>
+        <module>biodwh2-swisslipids</module>
+        <module>biodwh2-lmsd</module>
+        <module>biodwh2-npass</module>
+    </modules>
+
+    <packaging>pom</packaging>
+
+    <build>
+        <finalName>${project.artifactId}-v${project.version}</finalName>
+    </build>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>11</maven.compiler.source>
+        <maven.compiler.target>11</maven.compiler.target>
+
+        <junit-version>5.10.1</junit-version>
+    </properties>
+</project>
