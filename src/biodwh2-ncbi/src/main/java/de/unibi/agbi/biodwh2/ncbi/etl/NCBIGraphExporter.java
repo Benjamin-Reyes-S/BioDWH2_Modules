@@ -16,6 +16,7 @@ import de.unibi.agbi.biodwh2.core.Workspace;
 import de.unibi.agbi.biodwh2.core.etl.GraphExporter;
 import de.unibi.agbi.biodwh2.core.exceptions.ExporterException;
 import de.unibi.agbi.biodwh2.core.io.FileUtils;
+import de.unibi.agbi.biodwh2.core.io.biopax.Gene;
 import de.unibi.agbi.biodwh2.core.io.mvstore.MVStoreModel;
 import de.unibi.agbi.biodwh2.core.model.graph.Edge;
 import de.unibi.agbi.biodwh2.core.model.graph.Graph;
@@ -43,7 +44,7 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
 
     @Override
     public long getExportVersion() {
-        return 2;
+        return 5;
     }
 
     @Override
@@ -99,10 +100,12 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
         }
         LOGGER.info("Exporting gene2accession.gz...");
         MappingIterator<GeneAccession> accessions = FileUtils.openGzipTsv(workspace, dataSource, "gene2accession.gz",
-                                                                          GeneAccession.class);
-        while (accessions.hasNext()) {
+                                                                            GeneAccession.class);
+        Integer accessionCount= 0;                                                    
+        while (accessions.hasNext() && accessionCount < 100000) { // limit to 100k 
             GeneAccession accession = accessions.next();
-            if (!accession.taxonomyId.equals("9606")) // human identifier 9606
+                accessionCount++ ;
+                if (!accession.taxonomyId.equals("9606")) // human identifier 9606
                 continue;
             long geneId = Long.parseLong(accession.geneId);
             Node accessionNode = createAccessionNode(graph, accession);
@@ -112,9 +115,11 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
         // remote to test withouth 
         LOGGER.info("Exporting gene2go.gz..."); 
         MappingIterator<GeneGo> goAnnotations = FileUtils.openGzipTsv(workspace, dataSource, "gene2go.gz",
-                                                                      GeneGo.class);
-        while (goAnnotations.hasNext()) {
+                                                                    GeneGo.class);
+        Integer annCount= 0;
+        while (goAnnotations.hasNext() && annCount < 5000) { 
             GeneGo go = goAnnotations.next();
+                annCount++ ;
             if (!go.taxonomyId.equals("9606")) // only human genes 9606
                 continue;
             long geneId = Long.parseLong(go.geneId);
@@ -259,20 +264,16 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
         for (String entry : record.split("\n")) {
             if (entry.startsWith("LOCUS")) {
                 locus = entry.substring(12).trim();
-                inDefinition = false;
+                inDefinition = false;    
             } else if (entry.startsWith("DEFINITION")) {
                 definitionBuilder.append(entry.substring(12).trim());
                 inDefinition = true;
-            } else if (entry.startsWith("ACCESSION")) {
+             } else if (entry.startsWith("ACCESSION")) {
                 proteinId = entry.substring(12).trim();
                 inDefinition = false;
             } else if (entry.startsWith("VERSION")) {
                 version = entry.substring(12).trim();
                 inDefinition = false;
-            } else if (inDefinition && entry.startsWith("  ")) {
-                // continuation line of DEFINITION (starts with whitespace, no keyword)
-                definitionBuilder.append(" ").append(entry.trim());
-
             } else if (entry.startsWith("DBLINK")) {
                 db_link = entry.substring(12).trim();
                 inDefinition = false;
@@ -281,7 +282,10 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
                 inDefinition = false;
             } else if (entry.startsWith("SOURCE")) {
                 source = entry.substring(12).trim();
-                inDefinition = false;   
+                inDefinition = false;
+            } else if (inDefinition && entry.startsWith("  ")) {
+                // continuation line of DEFINITION (starts with whitespace, no keyword)
+                definitionBuilder.append(" ").append(entry.trim());                   
             } else {
                 inDefinition = false;
             }
@@ -311,14 +315,15 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
         graph.update(proteinNode);
         proteinIdNodeIdMap.put(proteinId, proteinNode.getId()); //implement proteinIdNodeIdMap as a class in the ncbi model package
 
-        // find corresponding accession node for protein via "version" property
+        // find accession node via "protein_accession.version" property to match to the "version" property of the protein node
         Node accessionNode = graph.findNode("Accession",
                                             "protein_accession.version", version);
         if (accessionNode == null)
             return; // no gene2accession entry for this protein → skip
 
         // Connect Protein → Accession
-        graph.addEdge(proteinNode, accessionNode, "HAS_ACCESSION");
+        Edge edge = graph.addEdge(proteinNode.getId(), accessionNode, "HAS_ACCESSION");
+        graph.update(edge);
     }
 }
 

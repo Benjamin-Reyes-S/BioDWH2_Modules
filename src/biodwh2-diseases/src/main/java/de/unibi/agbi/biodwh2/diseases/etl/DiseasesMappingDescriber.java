@@ -1,7 +1,6 @@
 package de.unibi.agbi.biodwh2.diseases.etl;
 
 import org.apache.commons.lang3.StringUtils;
-
 import de.unibi.agbi.biodwh2.core.DataSource;
 import de.unibi.agbi.biodwh2.core.etl.GraphExporter;
 import de.unibi.agbi.biodwh2.core.etl.MappingDescriber;
