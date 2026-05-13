@@ -16,7 +16,7 @@ import de.unibi.agbi.biodwh2.core.Workspace;
 import de.unibi.agbi.biodwh2.core.etl.GraphExporter;
 import de.unibi.agbi.biodwh2.core.exceptions.ExporterException;
 import de.unibi.agbi.biodwh2.core.io.FileUtils;
-import de.unibi.agbi.biodwh2.core.io.biopax.Gene;
+//import de.unibi.agbi.biodwh2.core.io.biopax.Gene;
 import de.unibi.agbi.biodwh2.core.io.mvstore.MVStoreModel;
 import de.unibi.agbi.biodwh2.core.model.graph.Edge;
 import de.unibi.agbi.biodwh2.core.model.graph.Graph;
@@ -44,7 +44,7 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
 
     @Override
     public long getExportVersion() {
-        return 5;
+        return 6;
     }
 
     @Override
@@ -100,29 +100,42 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
         }
         LOGGER.info("Exporting gene2accession.gz...");
         MappingIterator<GeneAccession> accessions = FileUtils.openGzipTsv(workspace, dataSource, "gene2accession.gz",
-                                                                            GeneAccession.class);
-        Integer accessionCount= 0;                                                    
-        while (accessions.hasNext() && accessionCount < 100000) { // limit to 100k 
+        
+                                                                           GeneAccession.class);    
+        int gene2accessionCount = 0;
+        final int max_count= 200000;
+
+        while (accessions.hasNext() && gene2accessionCount < max_count) { 
             GeneAccession accession = accessions.next();
-                accessionCount++ ;
-                if (!accession.taxonomyId.equals("9606")) // human identifier 9606
+
+            if (!accession.taxonomyId.equals("9606"))
                 continue;
+
             long geneId = Long.parseLong(accession.geneId);
             Node accessionNode = createAccessionNode(graph, accession);
             graph.addEdge(geneIdNodeIdMap.get(geneId), accessionNode, "HAS_ACCESSION");
+
+            gene2accessionCount++;
         }
+        LOGGER.info("Exported " + gene2accessionCount + " entries from gene2accession.gz");
 
         // remote to test withouth 
         LOGGER.info("Exporting gene2go.gz..."); 
         MappingIterator<GeneGo> goAnnotations = FileUtils.openGzipTsv(workspace, dataSource, "gene2go.gz",
                                                                     GeneGo.class);
-        Integer annCount= 0;
-        while (goAnnotations.hasNext() && annCount < 5000) { 
+
+        int countAnnota = 0;
+        int maxAnnotations = 200000;
+
+
+        while (goAnnotations.hasNext() && countAnnota < maxAnnotations) { 
             GeneGo go = goAnnotations.next();
-                annCount++ ;
-            if (!go.taxonomyId.equals("9606")) // only human genes 9606
+
+            if (!go.taxonomyId.equals("9606"))
                 continue;
+
             long geneId = Long.parseLong(go.geneId);
+
             Node goTermNode = graph.findNode("GoTerm", "id", go.goId);
             if (goTermNode == null) {
                 goTermNode = graph.addNode("GoTerm");
@@ -131,16 +144,24 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
                 goTermNode.setProperty("term", go.goTerm);
                 graph.update(goTermNode);
             }
+
             Edge edge = graph.addEdge(geneIdNodeIdMap.get(geneId), goTermNode, "HAS_GO_TERM");
             setPropertyIfNotDash(edge, "evidence", go.evidence);
             setPropertyIfNotDash(edge, "qualifier", go.qualifier);
             setArrayPropertyIfNotDash(edge, "pubmed_ids", go.pubMedIds);
             graph.update(edge);
-        }  
+
+            countAnnota++;
+        }
+        LOGGER.info("Exported " + countAnnota   + " entries from gene2go.gz");  
+
         LOGGER.info("Exporting gene_group.gz...");
         MappingIterator<GeneRelationship> groups = FileUtils.openGzipTsv(workspace, dataSource, "gene_group.gz",
                                                                          GeneRelationship.class);
-        while (groups.hasNext()) {
+
+        int countGroups = 0;
+        int maxGroups = 200000;
+        while (groups.hasNext() && countGroups < maxGroups) {
             GeneRelationship group = groups.next();
             if (!group.taxonomyId.equals("9606") || !group.otherTaxonomyId.equals("9606"))
                 continue;
@@ -160,11 +181,17 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
             Edge edge = graph.addEdge(geneNodeId, otherGeneNodeId, "RELATED_TO");
             edge.setProperty("type", group.relationship);
             graph.update(edge);
+
+            countGroups++;
         }    
         LOGGER.info("Exporting gene_orthologs.gz...");
         MappingIterator<GeneRelationship> orthologs = FileUtils.openGzipTsv(workspace, dataSource, "gene_orthologs.gz",
-                                                                            GeneRelationship.class);
-        while (orthologs.hasNext()) {
+                                                                            GeneRelationship.class);            
+        
+        int countOrthologs = 0;
+        int maxOrthologs = 200000;
+
+        while (orthologs.hasNext() && countOrthologs < maxOrthologs) {
             GeneRelationship ortholog = orthologs.next();
             if (!ortholog.taxonomyId.equals("9606") || !ortholog.otherTaxonomyId.equals("9606"))
                 continue;
@@ -181,8 +208,9 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
             Edge edge = graph.addEdge(geneNodeId, otherGeneNodeId, "RELATED_TO");
             edge.setProperty("type", ortholog.relationship);
             graph.update(edge);
-        }
 
+            countOrthologs++;
+        }
         }
 
     private Node createAccessionNode(final Graph graph, final GeneAccession accession) {
@@ -291,8 +319,10 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
             }
         }
 
-        if (proteinId == null)
-            return;
+        if (proteinId == null){
+            return; // skip record if no accession is found
+        }
+            
 
         String definition = definitionBuilder.length() > 0 ? definitionBuilder.toString() : null;
 
@@ -313,13 +343,16 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
             proteinNode.setProperty("source", source);
         // update node before adding edges
         graph.update(proteinNode);
-        proteinIdNodeIdMap.put(proteinId, proteinNode.getId()); //implement proteinIdNodeIdMap as a class in the ncbi model package
+        proteinIdNodeIdMap.put(proteinId, proteinNode.getId());
 
-        // find accession node via "protein_accession.version" property to match to the "version" property of the protein node
-        Node accessionNode = graph.findNode("Accession",
-                                            "protein_accession.version", version);
-        if (accessionNode == null)
+        Node accessionNode = graph.findNode("Accession", "protein_accession.version", version);
+        System.out.println("Looking for version: '" + version + "'");
+
+        if (accessionNode == null) {
             return; // no gene2accession entry for this protein → skip
+        } else {
+            System.out.println("Found accession: '" + accessionNode.getProperty("protein_accession.version") + "'");
+        }
 
         // Connect Protein → Accession
         Edge edge = graph.addEdge(proteinNode.getId(), accessionNode, "HAS_ACCESSION");
