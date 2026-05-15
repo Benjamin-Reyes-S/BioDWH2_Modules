@@ -5,6 +5,14 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+//for protein files, delete later when proteins in refseq
+import java.io.File;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.regex.Pattern;
+//prot files end 
+
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -44,7 +52,7 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
 
     @Override
     public long getExportVersion() {
-        return 6;
+        return 11;
     }
 
     @Override
@@ -58,6 +66,17 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
         proteinIdNodeIdMap = new HashMap<>();
         try {
             exportGeneDatabase(workspace, dataSource, graph);
+
+
+                // DEBUG: runs once after all accession nodes are created
+                int i = 0;
+                for (Node n : graph.getNodes("Accession")) {
+                    Object val = n.getProperty("protein_accession.version");
+                    System.out.println("Accession node has: '" + val + "'");
+                    if (++i >= 20) break;
+                }
+                //end of debug
+
             exportProteinDatabase(workspace, dataSource, graph);
         } catch (IOException e) {
             throw new ExporterException("Failed to export NCBI Gene database", e);
@@ -125,7 +144,7 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
                                                                     GeneGo.class);
 
         int countAnnota = 0;
-        int maxAnnotations = 200000;
+        int maxAnnotations = 1000;
 
 
         while (goAnnotations.hasNext() && countAnnota < maxAnnotations) { 
@@ -235,43 +254,65 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
         setPropertyIfNotDash(accessionNode, "orientation", accession.orientation);
         graph.update(accessionNode);
         return accessionNode;
+
+
     }
 
     private void setPropertyIfNotDash(final MVStoreModel container, final String propertyKey, final String value) {
-        if (value != null && !"-".equals(value))
+        if (value != null && !"-".equals(value) && !"null".equals(value))
             container.setProperty(propertyKey, value);
     }
 
     private void setLongPropertyIfNotDash(final MVStoreModel container, final String propertyKey, final String value) {
-        if (value != null && !"-".equals(value))
+        if (value != null && !"-".equals(value) && !"null".equals(value))
             container.setProperty(propertyKey, Long.parseLong(value));
     }
 
     private void setArrayPropertyIfNotDash(final MVStoreModel container, final String propertyKey, final String value) {
-        if (value != null && !"-".equals(value) && value.trim().length() > 0)
+        if (value != null && !"-".equals(value) && !"null".equals(value) && value.trim().length() > 0)
             container.setProperty(propertyKey, StringUtils.split(value, "|"));
     }
+
 
 
     // Protein exporter
     private void exportProteinDatabase(final Workspace workspace,
                                     final DataSource dataSource,
                                     final Graph graph) throws IOException {
-        LOGGER.info("Exporting protein.gpff...");
-        // first open and read the input from file, file is .gz so must use openGzip
-        try (final BufferedReader reader = FileUtils.createBufferedReaderFromStream(
-                FileUtils.openGzip(workspace, dataSource, "vertebrate_mammalian.10.protein.gpff.gz"))) {
-            final StringBuilder record = new StringBuilder();
-            String line;
-            // read line by line unless no more lines are available
-            while ((line = reader.readLine()) != null) {
-                record.append(line).append("\n");
-                // "//" indicates the end of one protein record
-                if (line.equals("//")) {
-                    parseProteinRecord(graph, record.toString());
-                    record.setLength(0);
+        // find all downloaded protein files matching the pattern
+        File workspaceDir = workspace.getDataSourceDirectory(dataSource.getId()).resolve("source").toFile();
+        Pattern pattern = Pattern.compile("vertebrate_mammalian\\.\\d+\\.protein\\.gpff\\.gz");
+        LOGGER.info("Looking for protein files in: " + workspaceDir.getAbsolutePath());
+
+        File[] proteinFiles = workspaceDir.listFiles(
+                (dir, name) -> pattern.matcher(name).matches()
+        );
+
+        if (proteinFiles == null || proteinFiles.length == 0) {
+            LOGGER.warn("No vertebrate_mammalian protein files found in workspace");
+            return;
+        }
+
+        // sort so they are processed in numeric order (file 1, 2, 3 ...)
+        Arrays.sort(proteinFiles, Comparator.comparing(File::getName));
+        LOGGER.info("Found " + proteinFiles.length + " protein files to export");
+
+        for (File file : proteinFiles) {
+            LOGGER.info("Exporting " + file.getName() + "...");
+            try (final BufferedReader reader = FileUtils.createBufferedReaderFromStream(
+                    FileUtils.openGzip(workspace, dataSource, file.getName()))) {
+                final StringBuilder record = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    record.append(line).append("\n");
+                    if (line.equals("//")) {
+                        parseProteinRecord(graph, record.toString());
+                        record.setLength(0);
+                    }
                 }
             }
+            LOGGER.info("Protein files readed: " + file.getName());
+            
         }
     }
 
@@ -346,8 +387,7 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
         proteinIdNodeIdMap.put(proteinId, proteinNode.getId());
 
         Node accessionNode = graph.findNode("Accession", "protein_accession.version", version);
-        System.out.println("Looking for version: '" + version + "'");
-
+        //System.out.println("Looking for version: '" + version + "'");
         if (accessionNode == null) {
             return; // no gene2accession entry for this protein → skip
         } else {

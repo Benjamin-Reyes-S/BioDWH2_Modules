@@ -3,6 +3,17 @@ package de.unibi.agbi.biodwh2.ncbi.etl;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+// for protein files, delete later when proteins in refseq
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+// prot files 
 
 import de.unibi.agbi.biodwh2.core.Workspace;
 import de.unibi.agbi.biodwh2.core.etl.MultiFileFTPWebUpdater;
@@ -10,6 +21,8 @@ import de.unibi.agbi.biodwh2.ncbi.NCBIDataSource;
 //import java.io.IOException;
 
 public class NCBIUpdater extends MultiFileFTPWebUpdater<NCBIDataSource> {
+    private static final Logger LOGGER = LogManager.getLogger(NCBIUpdater.class);
+
     public NCBIUpdater(NCBIDataSource dataSource) {
         super(dataSource);
     }
@@ -22,20 +35,54 @@ public class NCBIUpdater extends MultiFileFTPWebUpdater<NCBIDataSource> {
     @Override
     protected String[] getFilePaths(final Workspace workspace) {
         final String genePrefix = "gene/DATA/";
-        // protein file from refseq release — only file 10 for testing
         final String proteinPrefix = "refseq/release/vertebrate_mammalian/";
+
         List<String> files = new ArrayList<>();
-        Collections.addAll(files, genePrefix + "gene_group.gz", genePrefix + "gene_history.gz",
-                           genePrefix + "gene2accession.gz",
-                           genePrefix + "gene_info.gz", genePrefix + "gene_neighbors.gz",
-                           genePrefix + "gene_orthologs.gz", genePrefix + "gene_refseq_uniprotkb_collab.gz",
-                           genePrefix + "gene2ensembl.gz", genePrefix + "gene2go.gz",
-                           genePrefix + "gene2pubmed.gz", genePrefix + "go_process.dtd",
-                           genePrefix + "go_process.xml", genePrefix + "mim2gene_medgen",
-                           genePrefix + "stopwords_gene", genePrefix + "README",
-                           genePrefix + "README_ensembl",
-                           // single protein file for testing — replace with full list later
-                           proteinPrefix + "vertebrate_mammalian.10.protein.gpff.gz");
+
+        // static gene files
+        Collections.addAll(files,
+                genePrefix + "gene_group.gz",
+                genePrefix + "gene_history.gz",
+                genePrefix + "gene2accession.gz",
+                genePrefix + "gene_info.gz",
+                genePrefix + "gene_neighbors.gz",
+                genePrefix + "gene_orthologs.gz",
+                genePrefix + "gene_refseq_uniprotkb_collab.gz",
+                genePrefix + "gene2ensembl.gz",
+                genePrefix + "gene2go.gz",
+                genePrefix + "gene2pubmed.gz",
+                genePrefix + "go_process.dtd",
+                genePrefix + "go_process.xml",
+                genePrefix + "mim2gene_medgen",
+                genePrefix + "stopwords_gene",
+                genePrefix + "README",
+                genePrefix + "README_ensembl"
+        );
+
+        // dynamically discover all vertebrate_mammalian.*.protein.gpff.gz files
+        try {
+            String directoryUrl = getFTPIndexUrl() + proteinPrefix;
+            HttpURLConnection connection = (HttpURLConnection) new URL(directoryUrl).openConnection();
+            connection.setRequestMethod("GET");
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(connection.getInputStream()))) {
+                String line;
+                // pattern matches e.g. vertebrate_mammalian.1.protein.gpff.gz
+                Pattern pattern = Pattern.compile(
+                        "vertebrate_mammalian\\.\\d+\\.protein\\.gpff\\.gz");
+                while ((line = reader.readLine()) != null) {
+                    Matcher matcher = pattern.matcher(line);
+                    if (matcher.find()) {
+                        String filename = matcher.group();
+                        files.add(proteinPrefix + filename);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            LOGGER.error("Failed to list protein files from FTP directory", e);
+        }
+
+        LOGGER.info("Downloading " + files.size() + " files total");
         return files.toArray(new String[0]);
     }
 }
