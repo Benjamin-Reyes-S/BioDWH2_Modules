@@ -1,9 +1,8 @@
 package de.unibi.agbi.biodwh2.ncbi.parser;
 
-import de.unibi.agbi.biodwh2.core.io.FileUtils;
-
 import de.unibi.agbi.biodwh2.core.DataSource;
 import de.unibi.agbi.biodwh2.core.Workspace;
+import de.unibi.agbi.biodwh2.core.io.FileUtils;
 import de.unibi.agbi.biodwh2.ncbi.model.ProteinRecord;
 
 import org.apache.logging.log4j.LogManager;
@@ -12,18 +11,17 @@ import org.apache.logging.log4j.Logger;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.List;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 public class NCBIProteinParser {
     private static final Logger LOGGER = LogManager.getLogger(NCBIProteinParser.class);
 
-    private final List<ProteinRecord> proteinsRecord = new ArrayList<>();
-
-    public void readFile(final Workspace workspace, final DataSource dataSource) throws IOException {
+    public void readFile(final Workspace workspace,
+                         final DataSource dataSource,
+                         final Consumer<ProteinRecord> proteinConsumer) throws IOException {
         File workspaceDir = workspace.getDataSourceDirectory(dataSource.getId()).resolve("source").toFile();
         Pattern pattern = Pattern.compile("vertebrate_mammalian\\.\\d+\\.protein\\.gpff\\.gz");
 
@@ -53,7 +51,12 @@ public class NCBIProteinParser {
                     record.append(line).append("\n");
 
                     if (line.equals("//")) {
-                        parseProtein(record.toString());
+                        ProteinRecord protein = parseProtein(record.toString());
+
+                        if (protein != null) {
+                            proteinConsumer.accept(protein);
+                        }
+
                         record.setLength(0);
                     }
                 }
@@ -63,7 +66,7 @@ public class NCBIProteinParser {
         }
     }
 
-    public void parseProtein(final String record) {
+    public ProteinRecord parseProtein(final String record) {
         String proteinId = null;
         String version = null;
         String locus = null;
@@ -104,7 +107,7 @@ public class NCBIProteinParser {
         }
 
         if (proteinId == null) {
-            return;
+            return null;
         }
 
         ProteinRecord protein = new ProteinRecord();
@@ -119,10 +122,6 @@ public class NCBIProteinParser {
             protein.setDefinition(definitionBuilder.toString());
         }
 
-        proteinsRecord.add(protein);
-    }
-
-    public List<ProteinRecord> getProteinsRecord() {
-        return proteinsRecord;
+        return protein;
     }
 }
