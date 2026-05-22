@@ -36,6 +36,7 @@ public class NCBIUpdater extends MultiFileFTPWebUpdater<NCBIDataSource> {
     protected String[] getFilePaths(final Workspace workspace) {
         final String genePrefix = "gene/DATA/";
         final String proteinPrefix = "refseq/release/vertebrate_mammalian/";
+        final String taxonPrefix= "pub/taxonomy/";
 
         List<String> files = new ArrayList<>();
 
@@ -56,7 +57,8 @@ public class NCBIUpdater extends MultiFileFTPWebUpdater<NCBIDataSource> {
                 genePrefix + "mim2gene_medgen",
                 genePrefix + "stopwords_gene",
                 genePrefix + "README",
-                genePrefix + "README_ensembl"
+                genePrefix + "README_ensembl",
+                taxonPrefix + "taxdump.tar.gz"
         );
 
         // dynamically discover all vertebrate_mammalian.*.protein.gpff.gz files

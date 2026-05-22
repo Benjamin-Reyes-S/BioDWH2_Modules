@@ -28,12 +28,14 @@ import de.unibi.agbi.biodwh2.ncbi.model.GeneInfo;
 import de.unibi.agbi.biodwh2.ncbi.model.GeneRelationship;
 import de.unibi.agbi.biodwh2.ncbi.model.ProteinRecord;
 import de.unibi.agbi.biodwh2.ncbi.parser.NCBIProteinParser;
+import de.unibi.agbi.biodwh2.ncbi.parser.NCBITaxonParser;
 
 public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
     private static final Logger LOGGER = LogManager.getLogger(NCBIGraphExporter.class);
 
     private Map<Long, Long> geneIdNodeIdMap;
     private Map<String, Long> proteinIdNodeIdMap;
+    private Map<String, Long> taxonIdNodeIdMap;
 
     public NCBIGraphExporter(final NCBIDataSource dataSource) {
         super(dataSource);
@@ -41,23 +43,27 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
 
     @Override
     public long getExportVersion() {
-        return 14;
+        return 15;
     }
 
     @Override
     protected boolean exportGraph(final Workspace workspace, final Graph graph) throws ExporterException {
+        graph.addIndex(IndexDescription.forNode("Taxon", "id", IndexDescription.Type.UNIQUE));
         graph.addIndex(IndexDescription.forNode("Gene", "id", IndexDescription.Type.UNIQUE));
         graph.addIndex(IndexDescription.forNode("Protein", "id", IndexDescription.Type.UNIQUE));
         graph.addIndex(IndexDescription.forNode("Accession", "protein_accession.version",
                                                 IndexDescription.Type.NON_UNIQUE));
 
+        taxonIdNodeIdMap = new HashMap<>();
         geneIdNodeIdMap = new HashMap<>();
         proteinIdNodeIdMap = new HashMap<>();
 
         try {
-            exportGeneDatabase(workspace, dataSource, graph);
+            exportTaxonDatabase(workspace, dataSource, graph);
+            LOGGER.info("Exporting TaxonDatabase :D...");
+            exportGeneDatabase(workspace, dataSource, graph);   
             
-            NCBIProteinParser proteinParser = new NCBIProteinParser();
+            final NCBIProteinParser proteinParser = new NCBIProteinParser();
             proteinParser.readFile(workspace, dataSource, protein -> {
                 exportProteinRecord(protein, graph);
             });
@@ -67,6 +73,47 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
         }
 
         return true;
+    }
+
+    // TAXON EXPORTER
+    private void exportTaxonDatabase(final Workspace workspace, final DataSource dataSource,
+                                     final Graph graph) throws IOException {
+        LOGGER.info("Exporting taxdump.tar.gz...");
+        final NCBITaxonParser taxonParser = new NCBITaxonParser();
+        final Map<String, Map<String, List<String>>> taxonPropertiesByTaxId = taxonParser.parseNames(workspace,
+                                                                                                      dataSource);
+        taxonParser.parseNodes(workspace, dataSource, taxonPropertiesByTaxId);
+
+        for (final Map.Entry<String, Map<String, List<String>>> taxonEntry : taxonPropertiesByTaxId.entrySet()) {
+            final String taxId = taxonEntry.getKey();
+            final Node taxonNode = graph.addNode("Taxon");
+            taxonNode.setProperty("id", taxId);
+
+            for (final Map.Entry<String, List<String>> propertyEntry : taxonEntry.getValue().entrySet())
+                setTaxonProperty(taxonNode, propertyEntry.getKey(), propertyEntry.getValue());
+
+            taxonIdNodeIdMap.put(taxId, taxonNode.getId());
+            graph.update(taxonNode);
+        }
+        for (final Map.Entry<String, Map<String, List<String>>> taxonEntry : taxonPropertiesByTaxId.entrySet()) {
+                    final String taxId = taxonEntry.getKey();
+                    final List<String> parentTaxIds = taxonEntry.getValue().get("parent_tax_id");
+                    if (parentTaxIds == null || parentTaxIds.isEmpty())
+                        continue;
+
+                    final String parentTaxId = parentTaxIds.get(0);
+                    if (taxId.equals(parentTaxId))
+                        continue;
+                    LOGGER.info("Match taxId with parentalTaxId found");
+                    final Long taxonNodeId = taxonIdNodeIdMap.get(taxId);
+                    final Long parentTaxonNodeId = taxonIdNodeIdMap.get(parentTaxId);
+                    if (taxonNodeId == null || parentTaxonNodeId == null)
+                        continue;
+
+                    final Edge edge = graph.addEdge(parentTaxonNodeId,taxonNodeId, "PARENT_OF");
+                    edge.setProperty("type", "parent");
+                    graph.update(edge);
+                }
     }
 
     // GENES EXPORTER
@@ -260,5 +307,10 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
     private void setArrayPropertyIfNotDash(final MVStoreModel container, final String propertyKey, final String value) {
         if (value != null && !"-".equals(value) && !"null".equals(value) && value.trim().length() > 0)
             container.setProperty(propertyKey, StringUtils.split(value, "|"));
+    }
+
+    private void setTaxonProperty(final MVStoreModel container, final String propertyKey, final List<String> values) {
+        if (values != null)
+            container.setProperty(propertyKey, values.toArray(new String[0]));
     }
 }
