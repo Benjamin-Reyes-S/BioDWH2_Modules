@@ -2,8 +2,8 @@ package de.unibi.agbi.biodwh2.ncbi.etl;
 
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
@@ -27,7 +27,6 @@ import de.unibi.agbi.biodwh2.ncbi.model.GeneGo;
 import de.unibi.agbi.biodwh2.ncbi.model.GeneInfo;
 import de.unibi.agbi.biodwh2.ncbi.model.GeneRelationship;
 import de.unibi.agbi.biodwh2.ncbi.model.ProteinRecord;
-import de.unibi.agbi.biodwh2.ncbi.parser.NCBIProteinParser;
 import de.unibi.agbi.biodwh2.ncbi.parser.NCBITaxonParser;
 
 public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
@@ -60,14 +59,15 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
 
         try {
             exportTaxonDatabase(workspace, dataSource, graph);
-            LOGGER.info("Exporting TaxonDatabase :D...");
-            exportGeneDatabase(workspace, dataSource, graph);   
-            
+            LOGGER.info("Exported TaxonDatabase :D...");
+
+            //exportGeneDatabase(workspace, dataSource, graph);   
+            /* 
             final NCBIProteinParser proteinParser = new NCBIProteinParser();
             proteinParser.readFile(workspace, dataSource, protein -> {
                 exportProteinRecord(protein, graph);
             });
-
+*/
         } catch (IOException e) {
             throw new ExporterException("Failed to export NCBI database", e);
         }

@@ -1,19 +1,18 @@
 package de.unibi.agbi.biodwh2.ncbi.parser;
 
-import com.fasterxml.jackson.databind.MappingIterator;
-import de.unibi.agbi.biodwh2.core.Workspace;
-import de.unibi.agbi.biodwh2.core.DataSource;
-import de.unibi.agbi.biodwh2.ncbi.model.TaxonName;
-import de.unibi.agbi.biodwh2.ncbi.model.TaxonNode;
-import de.unibi.agbi.biodwh2.core.io.FileUtils;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import de.unibi.agbi.biodwh2.core.DataSource;
+import de.unibi.agbi.biodwh2.core.Workspace;
+import de.unibi.agbi.biodwh2.core.io.FileUtils;
 
 public class NCBITaxonParser {
     private static final Logger LOGGER = LogManager.getLogger(NCBITaxonParser.class);
@@ -25,57 +24,70 @@ public class NCBITaxonParser {
             throws IOException {
         final Map<String, Map<String, List<String>>> taxonPropertiesByTaxId = new LinkedHashMap<>();
 
-        try (final MappingIterator<TaxonName> iterator = FileUtils.openTarGzipTsvEntry(
+        try (final BufferedReader reader = FileUtils.openTarGzipDmpEntry(
                 workspace,
                 dataSource,
                 TAXDUMP_ARCHIVE,
-                "names.dmp",
-                TaxonName.class
+                "names.dmp"
         )) {
-            while (iterator.hasNext()) {
-                final TaxonName taxonName = iterator.next();
-                final Map<String, List<String>> taxonProperties = taxonPropertiesByTaxId.computeIfAbsent(
-                        taxonName.taxId, key -> new LinkedHashMap<>());
+            String line;
 
-                addProperty(taxonProperties, "name_txt", taxonName.nameTxt);
-                addProperty(taxonProperties, "unique_name", taxonName.uniqueName);
-                addProperty(taxonProperties, "name_class", taxonName.nameClass);
+            while ((line = reader.readLine()) != null) {
+                final String[] parts = line.split("\\|", -1);
+
+                final String taxId = parts[0].trim();
+                final String nameTxt = parts[1].trim();
+                final String uniqueName = parts[2].trim();
+                final String nameClass = parts[3].trim();
+
+                final Map<String, List<String>> taxonProperties = taxonPropertiesByTaxId.computeIfAbsent(
+                        taxId, key -> new LinkedHashMap<>());
+
+                addProperty(taxonProperties, "name_txt", nameTxt);
+                addProperty(taxonProperties, "unique_name", uniqueName);
+                addProperty(taxonProperties, "name_class", nameClass);
             }
         }
 
         return taxonPropertiesByTaxId;
     }
 
-    // parse nodes.dmp and add node properties to taxonPropertiesByTaxId
+    // parse nodes.dmp and add node properties only if tax_id already exists from names.dmp
     public void parseNodes(
             final Workspace workspace,
             final DataSource dataSource,
             final Map<String, Map<String, List<String>>> taxonPropertiesByTaxId
     ) throws IOException {
-        try (final MappingIterator<TaxonNode> iterator = FileUtils.openTarGzipTsvEntry(
+        try (final BufferedReader reader = FileUtils.openTarGzipDmpEntry(
                 workspace,
                 dataSource,
                 TAXDUMP_ARCHIVE,
-                "nodes.dmp",
-                TaxonNode.class
+                "nodes.dmp"
         )) {
-            while (iterator.hasNext()) {
-                final TaxonNode taxonNode = iterator.next();
-                final Map<String, List<String>> taxonProperties = taxonPropertiesByTaxId.computeIfAbsent(
-                        taxonNode.taxId, key -> new LinkedHashMap<>());
+            String line;
 
-                addProperty(taxonProperties, "parent_tax_id", taxonNode.parentTaxId);
-                addProperty(taxonProperties, "rank", taxonNode.rank);
-                addProperty(taxonProperties, "embl_code", taxonNode.emblCode);
-                addProperty(taxonProperties, "division_id", taxonNode.divisionId);
-                addProperty(taxonProperties, "inherited_div_flag", taxonNode.inheritedDivFlag);
-                addProperty(taxonProperties, "genetic_code_id", taxonNode.geneticCodeId);
-                addProperty(taxonProperties, "inherited_gc_flag", taxonNode.inheritedGcFlag);
-                addProperty(taxonProperties, "mitochondrial_genetic_code_id", taxonNode.mitochondrialGeneticCodeId);
-                addProperty(taxonProperties, "inherited_mgc_flag", taxonNode.inheritedMgcFlag);
-                addProperty(taxonProperties, "genbank_hidden_flag", taxonNode.genbankHiddenFlag);
-                addProperty(taxonProperties, "hidden_subtree_root_flag", taxonNode.hiddenSubtreeRootFlag);
-                addProperty(taxonProperties, "comments", taxonNode.comments);
+            while ((line = reader.readLine()) != null) {
+                final String[] parts = line.split("\\|", -1);
+
+                final String taxId = parts[0].trim();
+
+                if (!taxonPropertiesByTaxId.containsKey(taxId))
+                    continue;
+
+                final Map<String, List<String>> taxonProperties = taxonPropertiesByTaxId.get(taxId);
+
+                addProperty(taxonProperties, "parent_tax_id", parts[1].trim());
+                addProperty(taxonProperties, "rank", parts[2].trim());
+                addProperty(taxonProperties, "embl_code", parts[3].trim());
+                addProperty(taxonProperties, "division_id", parts[4].trim());
+                addProperty(taxonProperties, "inherited_div_flag", parts[5].trim());
+                addProperty(taxonProperties, "genetic_code_id", parts[6].trim());
+                addProperty(taxonProperties, "inherited_gc_flag", parts[7].trim());
+                addProperty(taxonProperties, "mitochondrial_genetic_code_id", parts[8].trim());
+                addProperty(taxonProperties, "inherited_mgc_flag", parts[9].trim());
+                addProperty(taxonProperties, "genbank_hidden_flag", parts[10].trim());
+                addProperty(taxonProperties, "hidden_subtree_root_flag", parts[11].trim());
+                addProperty(taxonProperties, "comments", parts[12].trim());
             }
         }
     }
