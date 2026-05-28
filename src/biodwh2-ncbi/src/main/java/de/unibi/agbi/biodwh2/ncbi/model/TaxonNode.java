@@ -16,7 +16,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
     "inherited_mgc_flag",
     "genbank_hidden_flag",
     "hidden_subtree_root_flag",
-    "comments"
+    "comments",
+    "extra"
 })
 public class TaxonNode {
     @JsonProperty("tax_id")
@@ -57,4 +58,7 @@ public class TaxonNode {
 
     @JsonProperty("comments")
     public String comments;
+
+    @JsonProperty("extra")
+    public String extra;
 }

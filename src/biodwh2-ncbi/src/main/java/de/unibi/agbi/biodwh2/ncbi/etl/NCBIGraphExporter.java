@@ -28,7 +28,8 @@ import de.unibi.agbi.biodwh2.ncbi.model.GeneInfo;
 import de.unibi.agbi.biodwh2.ncbi.model.GeneRelationship;
 import de.unibi.agbi.biodwh2.ncbi.model.ProteinRecord;
 import de.unibi.agbi.biodwh2.ncbi.parser.NCBITaxonParser;
-
+import de.unibi.agbi.biodwh2.ncbi.parser.NCBIProteinParser;
+import de.unibi.agbi.biodwh2.core.model.TimeBottleNecks;
 public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
     private static final Logger LOGGER = LogManager.getLogger(NCBIGraphExporter.class);
 
@@ -42,7 +43,7 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
 
     @Override
     public long getExportVersion() {
-        return 15;
+        return 17;
     }
 
     @Override
@@ -58,16 +59,20 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
         proteinIdNodeIdMap = new HashMap<>();
 
         try {
-            exportTaxonDatabase(workspace, dataSource, graph);
-            LOGGER.info("Exported TaxonDatabase :D...");
+                long start = System.currentTimeMillis();
+                exportTaxonDatabase(workspace, dataSource, graph);
+                LOGGER.info("Exported TaxonDatabase in {}", TimeBottleNecks.formatElapsed(System.currentTimeMillis() - start));
 
-            //exportGeneDatabase(workspace, dataSource, graph);   
-            /* 
-            final NCBIProteinParser proteinParser = new NCBIProteinParser();
-            proteinParser.readFile(workspace, dataSource, protein -> {
-                exportProteinRecord(protein, graph);
+                start = System.currentTimeMillis();
+                exportGeneDatabase(workspace, dataSource, graph);
+                LOGGER.info("Exported GeneDatabase in {}", TimeBottleNecks.formatElapsed(System.currentTimeMillis() - start));
+
+                start = System.currentTimeMillis();
+                final NCBIProteinParser proteinParser = new NCBIProteinParser();
+                proteinParser.readFile(workspace, dataSource, protein -> {
+                    exportProteinRecord(protein, graph);
             });
-*/
+            LOGGER.info("Exported ProteinDatabase in {}", TimeBottleNecks.formatElapsed(System.currentTimeMillis() - start));
         } catch (IOException e) {
             throw new ExporterException("Failed to export NCBI database", e);
         }
@@ -124,11 +129,10 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
                                                                     GeneInfo.class);
         while (geneInfos.hasNext()) {
             GeneInfo geneInfo = geneInfos.next();
-            if (!geneInfo.taxonomyId.equals("9606"))
-                continue;
             long geneId = Long.parseLong(geneInfo.geneId);
             Node geneNode = graph.addNode("Gene");
             geneNode.setProperty("id", geneId);
+            setPropertyIfNotDash(geneNode, "tax_id", geneInfo.taxonomyId);
             setPropertyIfNotDash(geneNode, "symbol", geneInfo.symbol);
             setPropertyIfNotDash(geneNode, "chromosome", geneInfo.chromosome);
             setPropertyIfNotDash(geneNode, "locus_tag", geneInfo.locusTag);
@@ -141,6 +145,12 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
             setArrayPropertyIfNotDash(geneNode, "other_designations", geneInfo.otherDesignations);
             geneIdNodeIdMap.put(geneId, geneNode.getId());
             graph.update(geneNode);
+
+            Node taxonNode = graph.findNode("Taxon", "id", geneInfo.taxonomyId);
+            if (taxonNode == null) {
+            graph.addEdge(geneIdNodeIdMap.get(geneId), taxonNode, "HAS_TAXON");
+        }
+
         }
 
         LOGGER.info("Exporting gene2accession.gz...");
@@ -150,24 +160,26 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
         while (accessions.hasNext()) {
             GeneAccession accession = accessions.next();
 
+            /*
             if (!accession.taxonomyId.equals("9606"))
                 continue;
-
+            /* */
             long geneId = Long.parseLong(accession.geneId);
             Node accessionNode = createAccessionNode(graph, accession);
             graph.addEdge(geneIdNodeIdMap.get(geneId), accessionNode, "HAS_ACCESSION");
-        }
 
+
+        }
         LOGGER.info("Exporting gene2go.gz...");
         MappingIterator<GeneGo> goAnnotations = FileUtils.openGzipTsv(workspace, dataSource, "gene2go.gz",
                                                                       GeneGo.class);
 
         while (goAnnotations.hasNext()) {
             GeneGo go = goAnnotations.next();
-
+             /* 
             if (!go.taxonomyId.equals("9606"))
                 continue;
-
+             /* */
             long geneId = Long.parseLong(go.geneId);
 
             Node goTermNode = graph.findNode("GoTerm", "id", go.goId);
@@ -192,9 +204,10 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
 
         while (groups.hasNext()) {
             GeneRelationship group = groups.next();
+             /* 
             if (!group.taxonomyId.equals("9606") || !group.otherTaxonomyId.equals("9606"))
                 continue;
-
+             /* */
             long geneId = Long.parseLong(group.geneId);
             long otherGeneId = Long.parseLong(group.otherGeneId);
 
@@ -216,9 +229,10 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
 
         while (orthologs.hasNext()) {
             GeneRelationship ortholog = orthologs.next();
+             /* 
             if (!ortholog.taxonomyId.equals("9606") || !ortholog.otherTaxonomyId.equals("9606"))
                 continue;
-
+             /* */
             long geneId = Long.parseLong(ortholog.geneId);
             long otherGeneId = Long.parseLong(ortholog.otherGeneId);
 
