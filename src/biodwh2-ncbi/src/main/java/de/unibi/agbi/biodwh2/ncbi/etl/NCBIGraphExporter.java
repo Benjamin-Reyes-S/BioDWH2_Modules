@@ -43,7 +43,7 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
 
     @Override
     public long getExportVersion() {
-        return 17;
+        return 18;
     }
 
     @Override
@@ -109,7 +109,6 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
                     final String parentTaxId = parentTaxIds.get(0);
                     if (taxId.equals(parentTaxId))
                         continue;
-                    LOGGER.info("Match taxId with parentalTaxId found");
                     final Long taxonNodeId = taxonIdNodeIdMap.get(taxId);
                     final Long parentTaxonNodeId = taxonIdNodeIdMap.get(parentTaxId);
                     if (taxonNodeId == null || parentTaxonNodeId == null)
@@ -147,7 +146,7 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
             graph.update(geneNode);
 
             Node taxonNode = graph.findNode("Taxon", "id", geneInfo.taxonomyId);
-            if (taxonNode == null) {
+            if (taxonNode != null) {
             graph.addEdge(geneIdNodeIdMap.get(geneId), taxonNode, "HAS_TAXON");
         }
 
