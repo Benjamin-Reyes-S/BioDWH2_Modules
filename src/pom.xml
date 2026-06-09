@@ -5,7 +5,7 @@
 
     <groupId>de.unibi.agbi.biodwh2</groupId>
     <artifactId>biodwh2</artifactId>
-    <version>0.69_NCBI0</version> <!-- BioDWH2 version -->
+    <version>0.68_NCBI_T</version> <!-- BioDWH2 version -->
 
     <distributionManagement>
         <repository>
