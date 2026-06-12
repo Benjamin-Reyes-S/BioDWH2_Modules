@@ -36,6 +36,7 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
     private Map<Long, Long> geneIdNodeIdMap;
     private Map<String, Long> proteinIdNodeIdMap;
     private Map<String, Long> taxonIdNodeIdMap;
+    private Map<String, Long> goTermIdNodeIdMap;
 
     public NCBIGraphExporter(final NCBIDataSource dataSource) {
         super(dataSource);
@@ -50,13 +51,16 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
     protected boolean exportGraph(final Workspace workspace, final Graph graph) throws ExporterException {
         graph.addIndex(IndexDescription.forNode("Taxon", "id", IndexDescription.Type.UNIQUE));
         graph.addIndex(IndexDescription.forNode("Gene", "id", IndexDescription.Type.UNIQUE));
+        graph.addIndex(IndexDescription.forNode("GoTerm", "id", IndexDescription.Type.UNIQUE));
         graph.addIndex(IndexDescription.forNode("Protein", "id", IndexDescription.Type.UNIQUE));
         graph.addIndex(IndexDescription.forNode("Accession", "protein_accession.version",
-                                                IndexDescription.Type.NON_UNIQUE));
-
+                                               IndexDescription.Type.NON_UNIQUE));
+                                               
+        goTermIdNodeIdMap = new HashMap<>();
         taxonIdNodeIdMap = new HashMap<>();
         geneIdNodeIdMap = new HashMap<>();
         proteinIdNodeIdMap = new HashMap<>();
+        
 
         try {
                 long start = System.currentTimeMillis();
@@ -128,6 +132,9 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
                                                                     GeneInfo.class);
         while (geneInfos.hasNext()) {
             GeneInfo geneInfo = geneInfos.next();
+
+            if (geneInfo.geneId == null || geneInfo.taxonomyId == null)
+                continue;
             long geneId = Long.parseLong(geneInfo.geneId);
             Node geneNode = graph.addNode("Gene");
             geneNode.setProperty("id", geneId);
@@ -145,11 +152,17 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
             geneIdNodeIdMap.put(geneId, geneNode.getId());
             graph.update(geneNode);
 
+
+            /*       
             Node taxonNode = graph.findNode("Taxon", "id", geneInfo.taxonomyId);
             if (taxonNode != null) {
             graph.addEdge(geneIdNodeIdMap.get(geneId), taxonNode, "HAS_TAXON");
         }
-
+         */
+            // already fully loaded into the map during exportTaxonDatabase()
+            final Long taxonNodeId = taxonIdNodeIdMap.get(geneInfo.taxonomyId);
+            if (taxonNodeId != null)
+                graph.addEdge(geneNode.getId(), taxonNodeId, "HAS_TAXON");
         }
 
         LOGGER.info("Exporting gene2accession.gz...");
@@ -158,7 +171,8 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
 
         while (accessions.hasNext()) {
             GeneAccession accession = accessions.next();
-
+            if (accession.geneId == null)
+                continue;
             /*
             if (!accession.taxonomyId.equals("9606"))
                 continue;
@@ -179,6 +193,9 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
             if (!go.taxonomyId.equals("9606"))
                 continue;
              /* */
+            if (go.geneId == null || go.goId == null)
+                continue;
+            
             long geneId = Long.parseLong(go.geneId);
 
             Node goTermNode = graph.findNode("GoTerm", "id", go.goId);
@@ -187,6 +204,7 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
                 goTermNode.setProperty("id", go.goId);
                 goTermNode.setProperty("category", go.category);
                 goTermNode.setProperty("term", go.goTerm);
+                goTermIdNodeIdMap.put(go.goId, goTermNode.getId());
                 graph.update(goTermNode);
             }
 
@@ -207,6 +225,10 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
             if (!group.taxonomyId.equals("9606") || !group.otherTaxonomyId.equals("9606"))
                 continue;
              /* */
+
+            if (group.geneId == null || group.otherGeneId == null)
+                continue;
+
             long geneId = Long.parseLong(group.geneId);
             long otherGeneId = Long.parseLong(group.otherGeneId);
 
@@ -232,6 +254,9 @@ public class NCBIGraphExporter extends GraphExporter<NCBIDataSource> {
             if (!ortholog.taxonomyId.equals("9606") || !ortholog.otherTaxonomyId.equals("9606"))
                 continue;
              /* */
+            if (ortholog.geneId == null || ortholog.otherGeneId == null)
+                continue;
+
             long geneId = Long.parseLong(ortholog.geneId);
             long otherGeneId = Long.parseLong(ortholog.otherGeneId);
 
