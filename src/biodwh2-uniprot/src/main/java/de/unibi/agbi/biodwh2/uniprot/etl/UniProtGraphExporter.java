@@ -41,18 +41,41 @@ public class UniProtGraphExporter extends GraphExporter<UniProtDataSource> {
     }
 
     @Override
-    protected boolean exportGraph(final Workspace workspace, final Graph graph) throws ExporterException {
+    protected boolean exportGraph(final Workspace workspace, final Graph graph)
+            throws ExporterException {
+
         dbReferenceCitationNodeIdMap.clear();
-        graph.addIndex(IndexDescription.forNode(ORGANISM_LABEL, ID_KEY, IndexDescription.Type.UNIQUE));
-        final File filePath = dataSource.resolveSourceFilePath(workspace, UniProtUpdater.SPROT_FILE_NAME).toFile();
-        if (!filePath.exists())
-            throw new ExporterException("Failed to parse the file '" + UniProtUpdater.SPROT_FILE_NAME + "'");
+
+        graph.addIndex(IndexDescription.forNode(
+            ORGANISM_LABEL,
+            ID_KEY,
+            IndexDescription.Type.UNIQUE
+        ));
+
+        exportUniProtFile(workspace, graph, UniProtUpdater.TREMBL_FILE_NAME);
+        exportUniProtFile(workspace, graph, UniProtUpdater.SPROT_FILE_NAME);
+        
+
+        return true;
+    }
+
+    private void exportUniProtFile(
+            final Workspace workspace,
+            final Graph graph,
+            final String fileName
+    ) throws ExporterException {
+
+        final File filePath = dataSource.resolveSourceFilePath(workspace, fileName).toFile();
+
+        if (!filePath.exists()) {
+            throw new ExporterException("Failed to parse the file '" + fileName + "'");
+        }
+
         try (final GZIPInputStream stream = FileUtils.openGzip(filePath.toString())) {
-            FileUtils.streamXmlList(stream, Entry.class, (protein -> exportEntry(graph, protein)));
+            FileUtils.streamXmlList(stream, Entry.class, entry -> exportEntry(graph, entry));
         } catch (IOException | XMLStreamException e) {
             throw new ExporterFormatException(e);
         }
-        return true;
     }
 
     private void exportEntry(final Graph graph, final Entry entry) throws ExporterException {
