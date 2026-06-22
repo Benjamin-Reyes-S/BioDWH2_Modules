@@ -64,6 +64,7 @@ public class UniProtGraphExporter extends GraphExporter<UniProtDataSource> {
             final Graph graph,
             final String fileName
     ) throws ExporterException {
+        LOGGER.info("Starting UniProt XML export for '{}'", fileName);
 
         final File filePath = dataSource.resolveSourceFilePath(workspace, fileName).toFile();
 
@@ -104,10 +105,13 @@ public class UniProtGraphExporter extends GraphExporter<UniProtDataSource> {
             builder.withProperty("keywords", entry.keyword.stream().map((k) -> k.value).toArray(String[]::new));
             builder.withProperty("keyword_ids", entry.keyword.stream().map((k) -> k.id).toArray(String[]::new));
             // TODO: evidence
+
+            /*
             for (final Keyword keyword : entry.keyword)
                 if (keyword.evidence != null && !keyword.evidence.isEmpty())
                     LOGGER.warn("Evidence for keyword '{}' ({}) not exported", keyword.value, keyword.id);
-        }
+            */
+        } 
         if (entry.protein != null) {
             if (entry.protein.recommendedName != null) {
                 final var recommendedName = entry.protein.recommendedName;
@@ -146,17 +150,22 @@ public class UniProtGraphExporter extends GraphExporter<UniProtDataSource> {
             builder.withProperty("db_references", dbReferences);
         }
         final Node node = builder.build();
+
+        /*
         if (entry.gene != null) {
             for (final Gene gene : entry.gene) {
                 // TODO
             }
         }
+
         if (entry.geneLocation != null) {
             for (final GeneLocation location : entry.geneLocation) {
                 // TODO: in swiss-prot human only type is ever set and always "mitochondrion"
                 // LOGGER.info(location.type + ", " + location.evidence + ", " + location.name);
             }
         }
+        */
+
         final Map<Integer, Long> referenceKeyNodeIdMap = new HashMap<>();
         for (final Reference reference : entry.reference) {
             final String[] scopes = reference.scope != null ? reference.scope.toArray(new String[0]) : new String[0];
@@ -272,10 +281,12 @@ public class UniProtGraphExporter extends GraphExporter<UniProtDataSource> {
         final long nodeId = builder.build().getId();
         for (final String reference : dbReferences) {
             final Long existingNodeId = dbReferenceCitationNodeIdMap.get(reference);
+            /*
             if (existingNodeId != null && existingNodeId != nodeId) {
                 LOGGER.warn("DBReference '{}' already exists for node id {}, now found in node id {}", reference,
                             existingNodeId, nodeId);
             }
+            */
             dbReferenceCitationNodeIdMap.put(reference, nodeId);
         }
         return nodeId;
